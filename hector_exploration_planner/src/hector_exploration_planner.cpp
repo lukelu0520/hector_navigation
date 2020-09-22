@@ -32,7 +32,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <hector_nav_msgs/GetRobotTrajectory.h>
 #include <Eigen/Geometry>
-
+#include <cmath>
 #include <hector_exploration_planner/ExplorationPlannerConfig.h>
 
 #define STRAIGHT_COST 100
@@ -777,6 +777,182 @@ bool HectorExplorationPlanner::exploreWalls(const geometry_msgs::PoseStamped &st
   ROS_DEBUG("[hector_exploration_planner] wall-follow: END: exploreWalls. Plansize %d", (int)plan.size());
   return !plan.empty();
 }
+
+bool HectorExplorationPlanner::planSmoother(std::vector<geometry_msgs::PoseStamped> &raw_plan, std::vector<geometry_msgs::PoseStamped> &smoothed_plan){
+
+  //return false if raw_plan is empty
+  if(raw_plan.empty() || raw_plan.size()==0){
+    ROS_WARN("input plan is invalid, either empty or none path, please check it !");
+    return false;
+  }
+
+  //claim parameters and get essential info
+  smoothed_plan.clear();
+  std::vector<geometry_msgs::Point> raw_positions = getPlanPositions(raw_plan);
+  std::vector<geometry_msgs::Quaternion> raw_orientations = getPlanOrientations(raw_plan);
+  std::vector<geometry_msgs::Point> smoothed_positions;
+  std::vector<geometry_msgs::Quaternion> smoothed_orientations;
+  std::vector<double> distance;
+  std::string global_frame = costmap_ros_->getGlobalFrameID();
+  //calculate accumulated distances
+  distance = computeAccumulatedDistances(raw_positions);
+
+  //calculate smoothed positions & smoothed orientations
+  smoothed_positions = computeSmoothedPositions(distance, raw_positions);
+  smoothed_orientations = computeSmoothedOrientations(smoothed_positions, raw_orientations);
+
+  //get smoothed_plan by combining smoothed positions and smoothed orientations, and update header
+  geometry_msgs::PoseStamped tmp_pose_stamped;
+  for(int i = 0; i < smoothed_positions.size(); ++i){
+    tmp_pose_stamped.pose.position = smoothed_positions[i];
+    tmp_pose_stamped.pose.orientation = smoothed_orientations[i];
+    tmp_pose_stamped.header.stamp = ros::Time::now();
+    tmp_pose_stamped.header.frame_id = global_frame;
+    smoothed_plan.push_back(tmp_pose_stamped);
+  }
+
+  return true;
+}
+
+std::vector<geometry_msgs::Point> HectorExplorationPlanner::getPlanPositions(std::vector<geometry_msgs::PoseStamped> &plan) const
+{
+  const int plan_size = plan.size();
+  std::vector<geometry_msgs::Point> positions(plan_size);
+
+  for(int i = 0; i < plan_size; ++i){
+    positions[i] = plan[i].pose.position;
+  }
+
+  return positions;
+}
+
+std::vector<geometry_msgs::Quaternion> HectorExplorationPlanner::getPlanOrientations(std::vector<geometry_msgs::PoseStamped> &plan) const
+{
+  const int plan_size = plan.size();
+  std::vector<geometry_msgs::Quaternion> orientations(plan_size);
+
+  for(int i = 0; i < plan_size; ++i){
+    orientations[i] = plan[i].pose.orientation;
+  }
+
+  return orientations;
+}
+
+std::vector<double> HectorExplorationPlanner::computeAccumulatedDistances(std::vector<geometry_msgs::Point> &positions) const
+{
+  std::vector<double> result(positions.size(), 0);
+  
+  for(unsigned i = 1; i < positions.size(); i++){
+    double diff_x = std::pow(positions[i].x - positions[i-1].x, 2);
+    double diff_y = std::pow(positions[i].y - positions[i-1].y, 2);
+    double diff_z = std::pow(positions[i].z - positions[i-1].z, 2);
+    result[i] = result[i-1] + std::sqrt(diff_x + diff_y + diff_z);
+  }
+
+  return result;
+}
+
+std::vector<geometry_msgs::Point> HectorExplorationPlanner::computeSmoothedPositions(const std::vector<double> &distances, const std::vector<geometry_msgs::Point> &positions, double SMOOTHED_PATH_DISCRETIZATION) const
+{
+    // The total distance is in distances.back()
+    // => sample path along the accumulated (approx. for the time needed for the path).
+    // ROS_INFO("total linear distance = %f \n", distances.back());
+    //double SMOOTHED_PATH_DISCRETIZATION = 0.05;
+    std::vector<geometry_msgs::Point> smoothed_positions;
+    smoothed_positions.reserve(distances.back() / SMOOTHED_PATH_DISCRETIZATION + 1);
+
+    std::vector<double> samples;
+    samples.reserve(distances.back() / SMOOTHED_PATH_DISCRETIZATION);
+
+    std::vector<geometry_msgs::Point> samplesX;
+    samplesX.reserve(distances.back() / SMOOTHED_PATH_DISCRETIZATION);
+
+    std::vector<double>::const_iterator itT = distances.begin();
+    std::vector<geometry_msgs::Point>::const_iterator itX = positions.begin();
+
+    for(double d = 0; d < distances.back(); d += SMOOTHED_PATH_DISCRETIZATION)
+    {
+        if(d > *(itT + 1))
+        {
+            itT++;
+            itX++;
+        }
+        samples.push_back(d);
+        geometry_msgs::Point itX_samplesX = *itX;
+        geometry_msgs::Point itX_1_samplesX = *(itX + 1);
+        itX_1_samplesX.x = itX_samplesX.x + (itX_1_samplesX.x - itX_samplesX.x) * (d - *itT) / (*(itT + 1) - *itT);
+        itX_1_samplesX.y = itX_samplesX.y + (itX_1_samplesX.y - itX_samplesX.y) * (d - *itT) / (*(itT + 1) - *itT);
+        itX_1_samplesX.z = itX_samplesX.z + (itX_1_samplesX.z - itX_samplesX.z) * (d - *itT) / (*(itT + 1) - *itT);
+        samplesX.push_back(itX_1_samplesX);
+    }
+    samples.push_back(distances.back());
+    samplesX.push_back(positions.back());
+
+    smoothed_positions.clear();
+    smoothed_positions.push_back(positions.front());
+    for(unsigned i = 1; i < samples.size() - 1; ++i)
+    {
+        geometry_msgs::Point pt; // claim a point
+        double weight = 0;
+        for(unsigned j = 0; j < samples.size(); ++j)
+            weight += gaussianWeight(samples[i], samples[j]);
+        for(unsigned j = 0; j < samples.size(); ++j)
+        {
+            double w_ij = gaussianWeight(samples[i], samples[j]);
+            pt.x += (w_ij / weight) * samplesX[j].x;
+            pt.y += (w_ij / weight) * samplesX[j].y;
+            pt.z += (w_ij / weight) * samplesX[j].z;
+        }
+        smoothed_positions.push_back(pt);
+    }
+    smoothed_positions.push_back(positions.back());
+    return smoothed_positions;
+}
+
+std::vector<geometry_msgs::Quaternion> HectorExplorationPlanner::computeSmoothedOrientations(const std::vector<geometry_msgs::Point> &smoothed_positions, const std::vector<geometry_msgs::Quaternion> &orientations) const
+{
+  std::vector<geometry_msgs::Quaternion> smoothed_orientations;
+  smoothed_orientations.reserve(smoothed_positions.size()); // size is the same as 'smoothed potiion' rather than raw_orientation
+
+  geometry_msgs::Quaternion start_orientation = orientations.front();
+  geometry_msgs::Quaternion end_orientation = orientations.back();
+
+  for(unsigned i = 0; i < smoothed_positions.size(); i++)
+  {
+      // Requires smoothed positions
+      // Computes the related orientations with forward difference approximation based on
+      // stepwidth of the smoothed path discretization over "virtual time variable"
+      if(0 < i && i < smoothed_positions.size() - 1)
+      {
+        geometry_msgs::Quaternion smoothed_q;
+        Eigen::Vector3d pos_vec;
+        pos_vec(0) = smoothed_positions[i + 1].x - smoothed_positions[i].x;
+        pos_vec(1) = smoothed_positions[i + 1].y - smoothed_positions[i].y;
+        pos_vec(2) = smoothed_positions[i + 1].z - smoothed_positions[i].z;
+        Eigen::Quaterniond q;
+        q.setFromTwoVectors(Eigen::Vector3d(1,0,0), pos_vec);
+        smoothed_q.x = q.x();
+        smoothed_q.y = q.y();
+        smoothed_q.z = q.z();
+        smoothed_q.w = q.w();
+        smoothed_orientations.push_back(smoothed_q);
+      }
+      else if(i == smoothed_positions.size() - 1)
+          smoothed_orientations.push_back(end_orientation);
+      else // i == 0
+          smoothed_orientations.push_back(start_orientation);
+  }
+
+    return smoothed_orientations;
+}
+
+double HectorExplorationPlanner::gaussianWeight(double t0, double t1, double PATH_SMOOTHNESS) const
+{
+  //double PATH_SMOOTHNESS=0.125;
+  ROS_INFO("I am making path smoothness: [%f]", PATH_SMOOTHNESS);
+  return std::exp(-std::pow(t0 - t1, 2.0) / (2.0 *  std::pow(PATH_SMOOTHNESS, 2.0)));
+}
+
 
 void HectorExplorationPlanner::setupMapData()
 {

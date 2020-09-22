@@ -90,6 +90,26 @@ public:
   float angleDifferenceWall(const geometry_msgs::PoseStamped &start, const geometry_msgs::PoseStamped &goal);
   bool exploreWalls(const geometry_msgs::PoseStamped &start, std::vector<geometry_msgs::PoseStamped> &goals);
 
+  /**
+    * This can be used for path smoothing to prevent zigzag path
+    * @param raw_plan The raw plan to explore into unknown space
+    * @param smoothed_plan The smoothed plan to explore into unknow space
+  */
+  bool planSmoother(std::vector<geometry_msgs::PoseStamped> &raw_plan, std::vector<geometry_msgs::PoseStamped> &smoothed_plan);
+
+protected:
+    std::vector<geometry_msgs::Point> getPlanPositions(std::vector<geometry_msgs::PoseStamped> &plan) const;
+
+    std::vector<geometry_msgs::Quaternion> getPlanOrientations(std::vector<geometry_msgs::PoseStamped> &plan) const;
+
+    std::vector<double> computeAccumulatedDistances(std::vector<geometry_msgs::Point> &positions) const;
+
+    std::vector<geometry_msgs::Point> computeSmoothedPositions(const std::vector<double> &distances, const std::vector<geometry_msgs::Point> &positions, double SMOOTHED_PATH_DISCRETIZATION = 0.05) const;
+
+    std::vector<geometry_msgs::Quaternion> computeSmoothedOrientations(const std::vector<geometry_msgs::Point> &smoothed_positions, const std::vector<geometry_msgs::Quaternion> &orientations) const;
+
+    double gaussianWeight(double t0, double t1, double PATH_SMOOTHNESS=0.125) const;
+
 private:
 
   enum LastMode{
