@@ -104,6 +104,7 @@ include_directories(
 ## Declare a cpp executable
 # add_executable(hector_exploration_node_node src/hector_exploration_node_node.cpp)
 add_executable(exploration_planner_node src/exploration_node.cpp)
+add_executable(exploration_planner_node_path_smooth src/exploration_node_path_smooth.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -113,7 +114,9 @@ add_executable(exploration_planner_node src/exploration_node.cpp)
 target_link_libraries(exploration_planner_node
   ${catkin_LIBRARIES}
 )
-
+target_link_libraries(exploration_planner_node_path_smooth
+  ${catkin_LIBRARIES}
+)
 #############
 ## Install ##
 #############

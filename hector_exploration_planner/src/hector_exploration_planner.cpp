@@ -949,7 +949,6 @@ std::vector<geometry_msgs::Quaternion> HectorExplorationPlanner::computeSmoothed
 double HectorExplorationPlanner::gaussianWeight(double t0, double t1, double PATH_SMOOTHNESS) const
 {
   //double PATH_SMOOTHNESS=0.125;
-  ROS_INFO("I am making path smoothness: [%f]", PATH_SMOOTHNESS);
   return std::exp(-std::pow(t0 - t1, 2.0) / (2.0 *  std::pow(PATH_SMOOTHNESS, 2.0)));
 }
 
