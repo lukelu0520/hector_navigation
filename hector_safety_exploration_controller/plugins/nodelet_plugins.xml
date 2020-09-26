@@ -1,0 +1,8 @@
+<library path="lib/libhector_safety_exploration_controller_nodelet">
+  <class name="hector_safety_exploration_controller/SafetyControllerNodelet" type="hector_kobuki::SafetyControllerNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet for Hector Kobuki's safety controller
+    </description>
+  </class>
+</library>
+

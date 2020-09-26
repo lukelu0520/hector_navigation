@@ -1,0 +1,14 @@
+<!-- Example/standalone launcher for hector_kobuki's safety exploration controller -->
+
+<launch>
+  <node pkg="nodelet" type="nodelet" name="nodelet_manager"  args="manager"/>
+  <node pkg="nodelet" type="nodelet" name="hector_safety_exploration_controller" args="load hector_safety_exploration_controller/SafetyControllerNodelet nodelet_manager">
+    <remap from="hector_safety_exploration_controller/enable" to="enable"/>
+    <remap from="hector_safety_exploration_controller/disable" to="disable"/>
+    <remap from="hector_safety_exploration_controller/reset" to="reset"/>
+    <remap from="hector_safety_exploration_controller/cmd_vel" to="cmd_vel"/>
+    <remap from="hector_safety_exploration_controller/events/bumper" to="events/bumper"/>
+    <remap from="hector_safety_exploration_controller/events/cliff" to="events/cliff"/>
+    <remap from="hector_safety_exploration_controller/events/wheel_drop" to="events/wheel_drop"/>
+  </node>
+</launch>

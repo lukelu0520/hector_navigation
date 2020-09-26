@@ -30,6 +30,7 @@
 #include <ros/ros.h>
 #include <hector_path_follower/hector_path_follower.h>
 #include <hector_nav_msgs/GetRobotTrajectory.h>
+#include <kobuki_msgs/BumperEvent.h>
 
 class SimpleExplorationController
 {
