@@ -63,7 +63,6 @@
 
 #include <hector_path_follower/hector_path_follower.h>
 #include <hector_nav_msgs/GetRobotTrajectory.h>
-#include <kobuki_msgs/BumperEvent.h>
 
 namespace hector_kobuki
 {
@@ -125,7 +124,7 @@ public:
     exploration_plan_generation_timer_ = nh_.createTimer(ros::Duration(15.0), &SafetyController::timerPlanExploration, this, false );
     cmd_vel_generator_timer_ = nh_.createTimer(ros::Duration(0.1), &SafetyController::timerCmdVelGeneration, this, false );
 
-    vel_pub_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 10);
+    vel_pub_ = nh_.advertise<geometry_msgs::Twist>("raw_cmd_vel", 10);
 
     return true;
   };
