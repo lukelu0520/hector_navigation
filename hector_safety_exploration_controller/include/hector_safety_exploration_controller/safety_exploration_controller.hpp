@@ -116,8 +116,8 @@ public:
     reset_safety_states_subscriber_ = nh_.subscribe("reset", 10, &SafetyController::resetSafetyStatesCB, this);
     velocity_command_publisher_ = nh_.advertise< geometry_msgs::Twist >("cmd_vel", 10);
 
-    //simple exploration controller part
-    exploration_plan_service_client_ = nh_.serviceClient<hector_nav_msgs::GetRobotTrajectory>("get_exploration_path");
+    //simple exploration controller part, need "/" to indicate global services or topics
+    exploration_plan_service_client_ = nh_.serviceClient<hector_nav_msgs::GetRobotTrajectory>("/get_exploration_path");
 
     path_follower_.initialize(&tfl_);
 
