@@ -117,14 +117,14 @@ public:
     velocity_command_publisher_ = nh_.advertise< geometry_msgs::Twist >("cmd_vel", 10);
 
     //simple exploration controller part
-    // exploration_plan_service_client_ = nh_.serviceClient<hector_nav_msgs::GetRobotTrajectory>("get_exploration_path");
+    exploration_plan_service_client_ = nh_.serviceClient<hector_nav_msgs::GetRobotTrajectory>("get_exploration_path");
 
-    // path_follower_.initialize(&tfl_);
+    path_follower_.initialize(&tfl_);
 
-    // exploration_plan_generation_timer_ = nh_.createTimer(ros::Duration(15.0), &SafetyController::timerPlanExploration, this, false );
-    // cmd_vel_generator_timer_ = nh_.createTimer(ros::Duration(0.1), &SafetyController::timerCmdVelGeneration, this, false );
+    exploration_plan_generation_timer_ = nh_.createTimer(ros::Duration(15.0), &SafetyController::timerPlanExploration, this, false );
+    cmd_vel_generator_timer_ = nh_.createTimer(ros::Duration(0.1), &SafetyController::timerCmdVelGeneration, this, false );
 
-    // vel_pub_ = nh_.advertise<geometry_msgs::Twist>("raw_cmd_vel", 10);
+    vel_pub_ = nh_.advertise<geometry_msgs::Twist>("raw_cmd_vel", 10);
 
     return true;
   };
@@ -401,7 +401,7 @@ void SafetyController::spin()
     }
     //if there is no safety event trigged, then load callback function for exploration
     else{
-      if(!safety_flag_) ROS_INFO("I am in spinOnce and safety flag = flase loop !");
+      if(!safety_flag_) ros::spinOnce();
     }
   }
 };
